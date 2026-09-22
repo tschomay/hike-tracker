@@ -1,4 +1,4 @@
-import { haversine, lineLength, distToLines, type LatLon } from "./geo";
+import { haversine, lineLength, distToLines, type LatLon } from "./geo.js";
 
 /** A hike the user can pick: one named trail, as one or more polylines. */
 export interface Trail {

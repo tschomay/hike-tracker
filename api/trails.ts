@@ -1,8 +1,8 @@
 // Server-side trail lookup: queries Overpass, parses into compact trails, and
 // lets Vercel's CDN cache the result per grid-snapped box so repeat searches
 // of an area are instant and don't touch Overpass at all.
-import { fetchTrailData, snapBBox, type BBox } from "../src/osm";
-import { parseTrails, compactTrails } from "../src/trails";
+import { fetchTrailData, snapBBox, type BBox } from "../src/osm.js";
+import { parseTrails, compactTrails } from "../src/trails.js";
 
 export async function GET(request: Request): Promise<Response> {
   const raw = new URL(request.url).searchParams.get("bbox")?.split(",").map(Number);

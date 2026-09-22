@@ -1,4 +1,4 @@
-import { haversine, nearestOnLines, type LatLon } from "./geo";
+import { haversine, nearestOnLines, type LatLon } from "./geo.js";
 
 export interface Fix {
   at: LatLon;

@@ -1,5 +1,5 @@
-import type { LatLon } from "./geo";
-import { compactTrails, parseTrails, type OverpassResponse, type Trail } from "./trails";
+import type { LatLon } from "./geo.js";
+import { compactTrails, parseTrails, type OverpassResponse, type Trail } from "./trails.js";
 
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",

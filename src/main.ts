@@ -1,10 +1,10 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
-import { compass, fmtDuration, fmtMiles, FT_PER_M, lineLength, type LatLon } from "./geo";
-import { directionsUrl, elevationGain, findTrails, geocode, type BBox } from "./osm";
-import type { Trail } from "./trails";
-import { newTrack, update, type Track } from "./tracker";
+import { compass, fmtDuration, fmtMiles, FT_PER_M, lineLength, type LatLon } from "./geo.js";
+import { directionsUrl, elevationGain, findTrails, geocode, type BBox } from "./osm.js";
+import type { Trail } from "./trails.js";
+import { newTrack, update, type Track } from "./tracker.js";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const sheet = $("sheet"), banner = $("banner"), here = $("here");
