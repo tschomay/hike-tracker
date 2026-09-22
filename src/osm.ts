@@ -1,5 +1,5 @@
 import type { LatLon } from "./geo";
-import type { OverpassResponse } from "./trails";
+import { compactTrails, parseTrails, type OverpassResponse, type Trail } from "./trails";
 
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
@@ -9,6 +9,13 @@ const OVERPASS = [
 
 /** [south, west, north, east] */
 export type BBox = [number, number, number, number];
+
+const GRID = 0.1;
+/** Expand a box outward to a 0.1° grid so nearby searches share a cache entry. */
+export function snapBBox([s, w, n, e]: BBox): BBox {
+  const r = (x: number) => Math.round(x * 10) / 10;
+  return [r(Math.floor(s / GRID) * GRID), r(Math.floor(w / GRID) * GRID), r(Math.ceil(n / GRID) * GRID), r(Math.ceil(e / GRID) * GRID)];
+}
 
 export function trailQuery([s, w, n, e]: BBox): string {
   const bb = `${s},${w},${n},${e}`;
@@ -24,27 +31,86 @@ out;
 out tags center;`;
 }
 
-export async function fetchTrailData(bbox: BBox, signal?: AbortSignal): Promise<OverpassResponse> {
+/**
+ * Query Overpass with hedging: start on the first mirror, and each time a mirror
+ * fails or stays silent for `hedgeMs`, bring in the next one. First success wins.
+ */
+export async function fetchTrailData(
+  bbox: BBox,
+  signal?: AbortSignal,
+  perMirrorMs = 25000,
+  hedgeMs = 10000,
+): Promise<OverpassResponse> {
   const body = "data=" + encodeURIComponent(trailQuery(bbox));
-  let lastErr: unknown;
-  for (const url of OVERPASS) {
-    try {
-      // Give each mirror a fair shot, then move on to the next.
-      const timeout = AbortSignal.timeout(20000);
-      const res = await fetch(url, {
-        method: "POST",
-        body,
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      });
-      if (!res.ok) throw new Error(`Overpass ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      if (signal?.aborted) throw e;
-      lastErr = e;
-    }
+  const done = new AbortController();
+  const stop = () => done.abort();
+  signal?.addEventListener("abort", stop);
+  const attempt = async (url: string): Promise<OverpassResponse> => {
+    const res = await fetch(url, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        // Browsers ignore this; on the server it identifies us to Overpass as they ask.
+        "User-Agent": "hike-tracker/0.1 (+https://github.com/tschomay/hike-tracker)",
+      },
+      signal: AbortSignal.any([done.signal, AbortSignal.timeout(perMirrorMs)]),
+    });
+    if (!res.ok) throw new Error(`Overpass ${res.status} from ${new URL(url).host}`);
+    const json = (await res.json()) as OverpassResponse & { remark?: string };
+    // Overpass reports query timeouts as a 200 with a remark and partial data.
+    if (json.remark && /runtime error|timed out/i.test(json.remark)) throw new Error(json.remark);
+    return json;
+  };
+  try {
+    return await new Promise<OverpassResponse>((ok, fail) => {
+      let next = 0, failed = 0, timer: ReturnType<typeof setTimeout> | undefined;
+      const resolve = (v: OverpassResponse) => (clearTimeout(timer), ok(v));
+      const reject = (e: unknown) => (clearTimeout(timer), fail(e));
+      const errors: unknown[] = [];
+      const launch = () => {
+        if (next >= OVERPASS.length) return;
+        const url = OVERPASS[next++];
+        clearTimeout(timer);
+        timer = setTimeout(launch, hedgeMs);
+        attempt(url).then(resolve, (e) => {
+          errors.push(e);
+          if (++failed === OVERPASS.length || signal?.aborted) reject(signal?.aborted ? e : new Error(errors.map(String).join("; ")));
+          else if (next === failed) launch(); // nothing else in flight: move on now
+        });
+      };
+      launch();
+    });
+  } finally {
+    stop();
+    signal?.removeEventListener("abort", stop);
   }
-  throw lastErr;
+}
+
+/** Trails in (roughly) this box: cached server route first, direct Overpass as a fallback. */
+export async function findTrails(bbox: BBox, signal?: AbortSignal): Promise<Trail[]> {
+  const snapped = snapBBox(bbox);
+  const cacheKey = `trail.area.${snapped.join(",")}`;
+  const remember = (trails: Trail[]) => {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(trails));
+    } catch {} // storage full: fine, it's only an offline convenience
+    return trails;
+  };
+  try {
+    const res = await fetch(`/api/trails?bbox=${snapped.join(",")}`, { signal });
+    if (res.ok) return remember(((await res.json()) as { trails: Trail[] }).trails);
+  } catch (e) {
+    if (signal?.aborted) throw e;
+  }
+  try {
+    const c: LatLon = [(snapped[0] + snapped[2]) / 2, (snapped[1] + snapped[3]) / 2];
+    return remember(compactTrails(parseTrails(await fetchTrailData(snapped, signal), c)));
+  } catch (e) {
+    const saved = localStorage.getItem(cacheKey);
+    if (saved && !signal?.aborted) return JSON.parse(saved);
+    throw e;
+  }
 }
 
 export async function geocode(q: string): Promise<{ name: string; at: LatLon; bbox?: BBox } | null> {

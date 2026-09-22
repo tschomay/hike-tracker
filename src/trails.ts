@@ -184,3 +184,35 @@ export function parseTrails(data: OverpassResponse, center: LatLon): Trail[] {
 
   return trails.sort((x, y) => haversine(x.start, center) - haversine(y.start, center));
 }
+
+/** Douglas-Peucker: drop points that sit within tolM of the simplified line. */
+export function simplify(line: LatLon[], tolM: number): LatLon[] {
+  if (line.length < 3) return line;
+  const keep = new Uint8Array(line.length);
+  keep[0] = keep[line.length - 1] = 1;
+  const stack: [number, number][] = [[0, line.length - 1]];
+  while (stack.length) {
+    const [i, j] = stack.pop()!;
+    let worst = -1, worstD = tolM;
+    for (let k = i + 1; k < j; k++) {
+      const d = distToLines(line[k], [[line[i], line[j]]]);
+      if (d > worstD) (worst = k), (worstD = d);
+    }
+    if (worst > 0) {
+      keep[worst] = 1;
+      stack.push([i, worst], [worst, j]);
+    }
+  }
+  return line.filter((_, k) => keep[k]);
+}
+
+/** Shrink the payload sent to phones: ~2 m simplification, ~1 m coordinate precision. */
+export function compactTrails(trails: Trail[]): Trail[] {
+  const r = (p: LatLon): LatLon => [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5];
+  return trails.map((t) => ({
+    ...t,
+    lengthM: Math.round(t.lengthM),
+    start: r(t.start),
+    lines: t.lines.map((l) => simplify(l, 2).map(r)),
+  }));
+}

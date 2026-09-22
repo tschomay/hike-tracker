@@ -2,8 +2,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 import { compass, fmtDuration, fmtMiles, FT_PER_M, lineLength, type LatLon } from "./geo";
-import { directionsUrl, elevationGain, fetchTrailData, geocode, type BBox } from "./osm";
-import { parseTrails, type Trail } from "./trails";
+import { directionsUrl, elevationGain, findTrails, geocode, type BBox } from "./osm";
+import type { Trail } from "./trails";
 import { newTrack, update, type Track } from "./tracker";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -48,10 +48,10 @@ const save = () => {
 async function searchHere() {
   here.hidden = true;
   const c = map.getCenter();
-  // Keep queries to a reasonable box (~25 km) no matter how far out the map is zoomed.
+  // Keep queries to a reasonable box (~20 km) no matter how far out the map is zoomed.
   const b = map.getBounds();
-  const hs = Math.min((b.getNorth() - b.getSouth()) / 2, 0.12);
-  const hw = Math.min((b.getEast() - b.getWest()) / 2, 0.16);
+  const hs = Math.min((b.getNorth() - b.getSouth()) / 2, 0.08);
+  const hw = Math.min((b.getEast() - b.getWest()) / 2, 0.1);
   const bbox: BBox = [c.lat - hs, c.lng - hw, c.lat + hs, c.lng + hw];
   loading?.abort();
   loading = new AbortController();
@@ -60,8 +60,9 @@ async function searchHere() {
   view = { kind: "list" };
   render();
   try {
-    const data = await fetchTrailData(bbox, loading.signal);
-    trails = parseTrails(data, [c.lat, c.lng]);
+    trails = (await findTrails(bbox, loading.signal)).sort(
+      (a, b) => c.distanceTo(toLL(a.start)) - c.distanceTo(toLL(b.start)),
+    );
     searchedCenter = c;
     status = trails.length ? "" : "No mapped hikes here. Try moving the map.";
   } catch (e) {

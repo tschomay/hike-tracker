@@ -2,7 +2,7 @@
 // what the trail parser makes of it. Run in any environment with internet:
 //   npx esbuild scripts/eval-areas.ts --bundle --platform=node --outfile=/tmp/eval.mjs --format=esm && node /tmp/eval.mjs
 import { fetchTrailData, type BBox } from "../src/osm";
-import { parseTrails } from "../src/trails";
+import { parseTrails, compactTrails } from "../src/trails";
 import { fmtMiles } from "../src/geo";
 
 const areas: Record<string, BBox> = {
@@ -22,7 +22,8 @@ for (const [name, bbox] of Object.entries(areas)) {
   const t1 = Date.now();
   const trails = parseTrails(data, c);
   const kinds = trails.reduce((m, t) => ((m[t.startKind] = (m[t.startKind] ?? 0) + 1), m), {} as Record<string, number>);
-  console.log(`\n## ${name}: ${(text.length / 1e6).toFixed(2)} MB, fetch ${t1 - t0} ms, parse ${Date.now() - t1} ms, ${data.elements.length} elements -> ${trails.length} trails`, kinds);
+  const compact = JSON.stringify(compactTrails(trails)).length;
+  console.log(`\n## ${name}: ${(text.length / 1e6).toFixed(2)} MB raw, ${(compact / 1e3).toFixed(0)} KB compact, fetch ${t1 - t0} ms, parse ${Date.now() - t1} ms, ${data.elements.length} elements -> ${trails.length} trails`, kinds);
   const pieces = trails.filter((t) => t.lines.length > 1).length;
   console.log(`   multi-piece trails: ${pieces}`);
   for (const t of trails.slice(0, 6)) console.log(`   ${t.id.padEnd(12)} ${t.name.slice(0, 40).padEnd(40)} ${fmtMiles(t.lengthM).padStart(7)} pieces=${t.lines.length} ${t.loop ? "loop" : ""} start=${t.startKind}`);

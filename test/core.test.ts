@@ -106,3 +106,48 @@ describe("tracker", () => {
     expect(events).toEqual([null, null, null, null, "left-trail", null, "back-on-trail"]);
   });
 });
+
+describe("simplify + snap", async () => {
+  const { simplify } = await import("../src/trails");
+  const { snapBBox } = await import("../src/osm");
+  it("drops collinear points but keeps corners", () => {
+    const l: LatLon[] = [[40, -105], [40.001, -105], [40.002, -105], [40.002, -104.998]];
+    expect(simplify(l, 2)).toEqual([[40, -105], [40.002, -105], [40.002, -104.998]]);
+  });
+  it("snaps outward to a 0.1° grid", () => {
+    expect(snapBBox([39.95, -105.33, 40.07, -105.21])).toEqual([39.9, -105.4, 40.1, -105.2]);
+  });
+});
+
+describe("fetchTrailData hedging", async () => {
+  const { fetchTrailData } = await import("../src/osm");
+  const { vi } = await import("vitest");
+  it("falls through failing mirrors and returns the first success", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      calls.push(new URL(url).host);
+      if (calls.length === 1) return new Response("busy", { status: 504 });
+      return Response.json({ elements: [] });
+    });
+    await expect(fetchTrailData([40, -105, 40.1, -104.9], undefined, 1000, 500)).resolves.toEqual({ elements: [] });
+    expect(calls).toHaveLength(2);
+    vi.unstubAllGlobals();
+  });
+  it("hedges to the next mirror when the first is slow", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
+      calls.push(new URL(url).host);
+      if (calls.length === 1)
+        return new Promise((_, rej) => init.signal!.addEventListener("abort", () => rej(new Error("aborted"))));
+      return Promise.resolve(Response.json({ elements: [1] }));
+    });
+    await expect(fetchTrailData([40, -105, 40.1, -104.9], undefined, 5000, 50)).resolves.toEqual({ elements: [1] });
+    expect(calls).toHaveLength(2);
+    vi.unstubAllGlobals();
+  });
+  it("reports failure when every mirror fails", async () => {
+    vi.stubGlobal("fetch", async () => new Response("no", { status: 429 }));
+    await expect(fetchTrailData([40, -105, 40.1, -104.9], undefined, 1000, 500)).rejects.toThrow(/429/);
+    vi.unstubAllGlobals();
+  });
+});
