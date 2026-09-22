@@ -121,6 +121,9 @@ describe("simplify + snap", async () => {
   });
   it("snaps outward to a 0.1° grid", () => {
     expect(snapBBox([39.95, -105.33, 40.07, -105.21])).toEqual([39.9, -105.4, 40.1, -105.2]);
+    // Already on the grid: unchanged (float division would push 42.8 down to 42.7).
+    expect(snapBBox([42.8, -72.2, 42.9, -72])).toEqual([42.8, -72.2, 42.9, -72]);
+    expect(snapBBox([-33.9, 151.1, -33.8, 151.3])).toEqual([-33.9, 151.1, -33.8, 151.3]);
   });
 });
 

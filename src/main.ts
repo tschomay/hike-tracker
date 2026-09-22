@@ -60,6 +60,13 @@ async function searchHere() {
   trails = [];
   view = { kind: "list" };
   render();
+  const mine = loading;
+  const slow = setTimeout(() => {
+    if (loading === mine && view.kind === "list") {
+      status = "Still looking. The first search of a new area can take up to a minute; after that it's instant.";
+      render();
+    }
+  }, 8000);
   try {
     trails = (await findTrails(bbox, loading.signal)).sort(
       (a, b) => c.distanceTo(toLL(a.start)) - c.distanceTo(toLL(b.start)),
@@ -69,6 +76,8 @@ async function searchHere() {
   } catch (e) {
     if ((e as Error).name === "AbortError") return;
     status = "Couldn't reach the trail database. Try again.";
+  } finally {
+    clearTimeout(slow);
   }
   render();
 }
