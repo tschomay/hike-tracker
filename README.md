@@ -12,7 +12,7 @@ That's it. No accounts, feeds, or photos.
 
 - **Trails:** [OpenStreetMap](https://www.openstreetmap.org), queried live from the browser through the public [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API), with fallback mirrors. AllTrails builds its own trail database from OSM too ([their write-up](https://support.alltrails.com/hc/en-us/articles/360019246411-OSM-derivative-database-derivation-methodology)).
   A "trail" is either a named `route=hiking|foot` relation, or a group of connected paths that share a name.
-- **Trailhead:** a mapped `highway=trailhead` within 400 m of the trail. If there isn't one, the nearest public parking within 300 m. Otherwise, the end of the trail closest to where you searched.
+- **Trailhead:** a mapped `highway=trailhead` within 400 m of the trail. If there isn't one, the nearest public parking within 1.5 km. Otherwise, the end of the trail closest to where you searched.
 - **Elevation gain:** [Open-Meteo elevation API](https://open-meteo.com/en/docs/elevation-api).
 - **Map tiles:** [OpenTopoMap](https://opentopomap.org). Any tiles you've viewed are cached, and opening a trail pre-caches its area at zoom 13–15, so the map still works without signal.
 - **Search:** [Nominatim](https://nominatim.org).

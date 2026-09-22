@@ -29,7 +29,7 @@ export interface OverpassResponse {
 }
 
 const MIN_PATH_M = 800;
-const MIN_ROUTE_M = 300;
+const MIN_ROUTE_M = 800;
 
 /** Split a possibly-clipped Overpass geometry (nulls = outside bbox) into runs. */
 function toRuns(geom: Pt[] | undefined): LatLon[][] {
@@ -198,7 +198,7 @@ export function parseTrails(data: OverpassResponse, center: LatLon): Trail[] {
     };
     const th = near(trailheads, 400);
     if (th) return { id, name, lines, lengthM, start: th, startKind: "trailhead", loop };
-    const pk = near(parking, 300);
+    const pk = near(parking, 1500); // where you would actually park, even if a connector away
     if (pk) return { id, name, lines, lengthM, start: pk, startKind: "parking", loop };
     // No mapped trailhead: use whichever end of the main line is closer to the search center.
     const start = haversine(a, center) <= haversine(b, center) ? a : b;
