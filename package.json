@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@vercel/functions": "^3.9.9",
     "leaflet": "^1.9.4"
   },
   "devDependencies": {

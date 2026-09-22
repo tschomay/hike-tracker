@@ -25,11 +25,12 @@ const OVERPASS = [
 /** [south, west, north, east] */
 export type BBox = [number, number, number, number];
 
-const GRID = 0.1;
 /** Expand a box outward to a 0.1° grid so nearby searches share a cache entry. */
 export function snapBBox([s, w, n, e]: BBox): BBox {
-  const r = (x: number) => Math.round(x * 10) / 10;
-  return [r(Math.floor(s / GRID) * GRID), r(Math.floor(w / GRID) * GRID), r(Math.ceil(n / GRID) * GRID), r(Math.ceil(e / GRID) * GRID)];
+  // Work in tenths with a tiny epsilon: 42.8 / 0.1 is 427.99999999999994 in floating point.
+  const down = (x: number) => Math.floor(x * 10 + 1e-9) / 10;
+  const up = (x: number) => Math.ceil(x * 10 - 1e-9) / 10;
+  return [down(s), down(w), up(n), up(e)];
 }
 
 export function trailQuery([s, w, n, e]: BBox): string {
