@@ -83,13 +83,19 @@ export function stitch(lines: LatLon[][]): LatLon[][] {
   return chains;
 }
 
+const PAVED = new Set(["asphalt", "concrete", "paved", "paving_stones", "concrete:plates", "sett", "bricks"]);
+
+/** Standalone named paths worth calling a hike: no sidewalks, bike paths, or paved greenways. */
 function isHikeablePath(t: Record<string, string>): boolean {
   if (!t.name) return false;
   if (t.access === "private" || t.access === "no" || t.foot === "no") return false;
   if (t.footway === "sidewalk" || t.footway === "crossing") return false;
-  if (t.highway === "cycleway" && t.foot !== "designated") return false;
+  if (t.highway === "cycleway" || PAVED.has(t.surface)) return false;
   return true;
 }
+
+/** Same-named trail pieces this close together are one trail with a gap in the map data. */
+const MERGE_GAP_M = 150;
 
 /** Turn a raw Overpass response into a list of distinct, named trails. */
 export function parseTrails(data: OverpassResponse, center: LatLon): Trail[] {
@@ -148,11 +154,28 @@ export function parseTrails(data: OverpassResponse, center: LatLon): Trail[] {
       else parent.set(find(w.id), find(other));
     }
   }
-  const groups = new Map<number, OsmElement[]>();
+  let groups = new Map<number, OsmElement[]>();
   for (const w of freeWays) {
     const root = find(w.id);
     groups.set(root, [...(groups.get(root) ?? []), w]);
   }
+  // Second pass: join same-named groups separated by small mapping gaps.
+  const geo = new Map([...groups].map(([root, ws]) => [root, ws.flatMap((w) => toRuns(w.geometry))]));
+  const roots = [...groups.keys()];
+  for (let i = 0; i < roots.length; i++)
+    for (let j = i + 1; j < roots.length; j++) {
+      const a = roots[i], b = roots[j];
+      if (groups.get(a)![0].tags!.name.toLowerCase() !== groups.get(b)![0].tags!.name.toLowerCase()) continue;
+      if (find(a) === find(b)) continue;
+      const ends = geo.get(a)!.flatMap((l) => [l[0], l[l.length - 1]]);
+      if (ends.some((p) => distToLines(p, geo.get(b)!) < MERGE_GAP_M)) parent.set(find(a), find(b));
+    }
+  const merged = new Map<number, OsmElement[]>();
+  for (const w of freeWays) {
+    const root = find(w.id);
+    merged.set(root, [...(merged.get(root) ?? []), w]);
+  }
+  groups = merged;
   for (const [root, members] of groups) {
     const lines = stitch(members.flatMap((w) => toRuns(w.geometry)));
     if (!lines.length) continue;

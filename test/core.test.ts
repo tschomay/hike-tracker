@@ -56,6 +56,11 @@ describe("parseTrails", () => {
       // Two touching ways with the same name -> one trail.
       { type: "way", id: 20, nodes: [100, 101, 102], tags: { highway: "path", name: "Creek Trail" }, geometry: geom(line(40, 6, -104.9)) },
       { type: "way", id: 21, nodes: [102, 103], tags: { highway: "path", name: "Creek Trail" }, geometry: geom(line(40.005, 6, -104.9)) },
+      // Same name, not touching, but only ~110 m apart -> merged into Creek Trail.
+      { type: "way", id: 22, nodes: [104, 105], tags: { highway: "path", name: "Creek Trail" }, geometry: geom(line(40.011, 3, -104.9)) },
+      // Same name far away -> separate trail. Paved greenway -> dropped.
+      { type: "way", id: 23, nodes: [106, 107], tags: { highway: "path", name: "Creek Trail" }, geometry: geom(line(40.1, 10, -104.9)) },
+      { type: "way", id: 24, nodes: [108, 109], tags: { highway: "path", surface: "asphalt", name: "Greenway" }, geometry: geom(line(40, 20, -104.6)) },
       // Too short, and a sidewalk: both dropped.
       { type: "way", id: 30, nodes: [200, 201], tags: { highway: "path", name: "Stub" }, geometry: geom(line(40, 2, -104.8)) },
       { type: "way", id: 31, nodes: [300, 301], tags: { highway: "footway", footway: "sidewalk", name: "Main St" }, geometry: geom(line(40, 20, -104.7)) },
@@ -66,12 +71,12 @@ describe("parseTrails", () => {
   const trails = parseTrails(data, [40, -104.9]);
 
   it("builds one trail per route and per connected same-named path group", () => {
-    expect(trails.map((t) => t.name).sort()).toEqual(["Creek Trail", "Ridge Loop"]);
+    expect(trails.map((t) => t.name).sort()).toEqual(["Creek Trail", "Creek Trail", "Ridge Loop"]);
   });
   it("stitches grouped ways and measures length", () => {
     const creek = trails.find((t) => t.name === "Creek Trail")!;
-    expect(creek.lines).toHaveLength(1);
-    expect(creek.lengthM).toBeCloseTo(1112, -1);
+    expect(creek.lines).toHaveLength(2); // connected piece + the piece across the gap
+    expect(creek.lengthM).toBeCloseTo(1112 + 222, -1);
   });
   it("splits clipped relation geometry at nulls", () => {
     const ridge = trails.find((t) => t.name === "Ridge Loop")!;
