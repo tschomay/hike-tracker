@@ -1,0 +1,3 @@
+{
+  "functions": { "api/trails.ts": { "maxDuration": 90 } }
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1f3a2c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>Trail</title>
+  </head>
+  <body>
+    <div id="map"></div>
+    <form id="search" autocomplete="off">
+      <input id="q" type="search" placeholder="Search a place" enterkeyhint="search" />
+      <button type="button" id="locate" aria-label="My location">◎</button>
+    </form>
+    <button id="here" hidden>Search this area</button>
+    <div id="banner" hidden></div>
+    <section id="sheet"></section>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
