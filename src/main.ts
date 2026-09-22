@@ -1,7 +1,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
-import { compass, fmtDuration, fmtMiles, FT_PER_M, lineLength, type LatLon } from "./geo.js";
+import { compass, fmtDuration, fmtMiles, FT_PER_M, lineLength, nearestOnLines, type LatLon } from "./geo.js";
 import { directionsUrl, elevationGain, findTrails, geocode, type BBox } from "./osm.js";
 import type { Trail } from "./trails.js";
 import { newTrack, update, type Track } from "./tracker.js";
@@ -229,6 +229,13 @@ function renderStats() {
   if (t) t.textContent = fmtDuration(end - view.track.startedAt);
 }
 
+function startNote(t: Trail) {
+  if (t.startKind === "trail end") return "Directions go to the end of the trail (no trailhead mapped)";
+  const walk = nearestOnLines(t.start, t.lines).d;
+  const place = t.startKind === "trailhead" ? "the trailhead" : "the nearest parking";
+  return walk > 150 ? `Directions go to ${place}, ${fmtMiles(walk)} from the trail` : `Directions go to ${place}`;
+}
+
 function trailMeta(t: Trail, gainM?: number | null) {
   const bits = [fmtMiles(t.lengthM)];
   if (t.loop) bits.push("loop");
@@ -263,7 +270,7 @@ function render() {
         <button class="close" aria-label="Back">✕</button>
         <h2>${esc(t.name)}</h2>
         <p class="meta">${trailMeta(t, view.gainM)}</p>
-        <p class="sub">Starts at ${t.startKind === "trail end" ? "the trail's end (no mapped trailhead)" : `a mapped ${t.startKind}`}</p>
+        <p class="sub">${startNote(t)}</p>
         <div class="actions">
           <a class="btn" href="${directionsUrl(t.start)}" target="_blank" rel="noopener">Directions</a>
           <button class="btn primary" id="go">Start hike</button>
