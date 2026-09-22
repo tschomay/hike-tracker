@@ -15,6 +15,7 @@ const map = L.map("map", { zoomControl: false, attributionControl: true }).setVi
 L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
   maxZoom: 17,
   subdomains: "abc",
+  crossOrigin: true, // CORS (not opaque) responses, so the service worker can tell errors from tiles
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, © <a href="https://opentopomap.org">OpenTopoMap</a>',
 }).addTo(map);
 const trailLayer = L.layerGroup().addTo(map);
@@ -104,7 +105,9 @@ async function openTrail(t: Trail) {
 }
 
 /** Warm the service worker's tile cache along the trail so the map works without signal. */
+let prefetchGen = 0;
 function prefetchTiles(t: Trail) {
+  const gen = ++prefetchGen;
   const b = L.latLngBounds(t.lines.flat().map(toLL)).pad(0.1);
   const urls: string[] = [];
   for (let z = 13; z <= 15; z++) {
@@ -114,7 +117,11 @@ function prefetchTiles(t: Trail) {
       for (let y = nw.y; y <= se.y; y++) urls.push(`https://${"abc"[(x + y) % 3]}.tile.opentopomap.org/${z}/${x}/${y}.png`);
   }
   if (urls.length > 300) return;
-  urls.forEach((u, i) => setTimeout(() => fetch(u, { mode: "no-cors" }).catch(() => {}), i * 50));
+  urls.forEach((u, i) =>
+    setTimeout(() => {
+      if (gen === prefetchGen) fetch(u).catch(() => {}); // stop if another trail was opened
+    }, i * 50),
+  );
 }
 
 // ---------- tracking ----------
@@ -141,13 +148,23 @@ async function keepAwake() {
   } catch {}
 }
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && view.kind === "tracking") keepAwake();
+  if (document.visibilityState === "visible") {
+    if (view.kind === "tracking") keepAwake();
+    startWatching();
+  } else if (view.kind !== "tracking" && watchId != null) {
+    // Not hiking: don't keep high-accuracy GPS on while the app is in the background.
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
 });
 
 function startTracking(trail: Trail, track = newTrack(trail.id)) {
+  if (view.kind === "tracking") return;
   view = { kind: "tracking", trail, track };
   try {
     audio ??= new AudioContext();
+    // After a reload there was no tap yet, so iOS keeps audio suspended until the next one.
+    if (audio.state === "suspended") document.addEventListener("pointerdown", () => audio?.resume(), { once: true });
   } catch {}
   keepAwake();
   trackLine.setLatLngs(track.points.map(toLL));

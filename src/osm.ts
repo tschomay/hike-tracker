@@ -1,6 +1,21 @@
 import type { LatLon } from "./geo.js";
 import { compactTrails, parseTrails, type OverpassResponse, type Trail } from "./trails.js";
 
+/** Stand-in for AbortSignal's any(): iOS Safari only has it from 17.4. */
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const c = new AbortController();
+  for (const sig of signals) {
+    if (sig.aborted) c.abort(sig.reason);
+    else sig.addEventListener("abort", () => c.abort(sig.reason), { once: true });
+  }
+  return c.signal;
+}
+function timeoutSignal(ms: number): AbortSignal {
+  const c = new AbortController();
+  setTimeout(() => c.abort(new DOMException("Timed out", "TimeoutError")), ms);
+  return c.signal;
+}
+
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
@@ -54,7 +69,7 @@ export async function fetchTrailData(
         // Browsers ignore this; on the server it identifies us to Overpass as they ask.
         "User-Agent": "hike-tracker/0.1 (+https://github.com/tschomay/hike-tracker)",
       },
-      signal: AbortSignal.any([done.signal, AbortSignal.timeout(perMirrorMs)]),
+      signal: anySignal([done.signal, timeoutSignal(perMirrorMs)]),
     });
     if (!res.ok) throw new Error(`Overpass ${res.status} from ${new URL(url).host}`);
     const json = (await res.json()) as OverpassResponse & { remark?: string };
