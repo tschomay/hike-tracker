@@ -10,7 +10,11 @@ That's it. No accounts, feeds, or photos.
 
 ## Where the data comes from
 
-- **Trails:** [OpenStreetMap](https://www.openstreetmap.org), queried live from the browser through the public [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API), with fallback mirrors. AllTrails builds its own trail database from OSM too ([their write-up](https://support.alltrails.com/hc/en-us/articles/360019246411-OSM-derivative-database-derivation-methodology)).
+- **Trails:** [OpenStreetMap](https://www.openstreetmap.org), via the public [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API). AllTrails builds its own trail database from OSM too ([their write-up](https://support.alltrails.com/hc/en-us/articles/360019246411-OSM-derivative-database-derivation-methodology)).
+  - `api/trails` (Vercel function) snaps a search to a 0.1° grid and queries Overpass. It tries mirrors, bringing in the next one if the current one fails or is silent for 12 s. It parses the result into compact trails (~10x smaller than raw).
+  - Each area is kept in Vercel's runtime cache for 30 days and counts as fresh for 7. If Overpass is down, the stale copy is served.
+  - If the function fails, the browser queries Overpass directly, then falls back to the last result it saved for that area.
+  - Public Overpass is often slow, so the **first** search of an area can take up to a minute. Repeat searches are instant.
   A "trail" is either a named `route=hiking|foot` relation, or a group of connected paths that share a name.
 - **Trailhead:** a mapped `highway=trailhead` within 400 m of the trail. If there isn't one, the nearest public parking within 1.5 km. Otherwise, the end of the trail closest to where you searched.
 - **Elevation gain:** [Open-Meteo elevation API](https://open-meteo.com/en/docs/elevation-api).
@@ -35,7 +39,7 @@ npm test        # unit tests (geometry, trail stitching, tracker)
 npm run build   # typecheck + production build to dist/
 ```
 
-`scripts/eval-areas.ts` runs the trail parser against live Overpass data for a few real areas. It's a sanity check for data quality and needs internet access.
+`npm run dev` also serves `api/` locally. `scripts/eval-areas.ts` runs the trail parser against live Overpass data for a few real areas. It's a sanity check for data quality and needs internet access.
 
 ## Deploy
 
